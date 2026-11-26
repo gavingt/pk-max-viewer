@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>PK MAX Drive Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* layout: a product turntable - the drive on a lit stage, the six designs as a strip of finish chips beside it */
+:root {
+  --bg: #eef0f3;
+  --panel: #ffffff;
+  --ink: #1b2230;
+  --muted: #5d6676;
+  --line: #d7dbe2;
+  --stage-top: #f7f8fa;
+  --stage-bottom: #dfe3ea;
+  --accent: #2f5bd3;
+  --chip-on: #1b2230;
+  --chip-on-ink: #ffffff;
+  --display: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --panel: #1a1f28; --ink: #e8ebf1; --muted: #9aa3b2; --line: #2c3340;
+    --stage-top: #262c37; --stage-bottom: #12151b; --accent: #7d9cf2; --chip-on: #e8ebf1; --chip-on-ink: #12151b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151b; --panel: #1a1f28; --ink: #e8ebf1; --muted: #9aa3b2; --line: #2c3340;
+  --stage-top: #262c37; --stage-bottom: #12151b; --accent: #7d9cf2; --chip-on: #e8ebf1; --chip-on-ink: #12151b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(22px, 3vw, 30px); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.spec { font-family: var(--mono); font-size: 12.5px; color: var(--muted); letter-spacing: 0.02em; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.stage {
+  position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line);
+  background: radial-gradient(120% 90% at 50% 25%, var(--stage-top), var(--stage-bottom));
+  aspect-ratio: 4 / 5; max-height: 78vh; width: 100%; min-width: 0;
+}
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.stage canvas:active { cursor: grabbing; }
+.status { position: absolute; inset: auto 0 14px 0; text-align: center; font-size: 13px; color: var(--muted); pointer-events: none; }
+.viewcol { display: grid; gap: 8px; min-width: 0; }
+.hint { margin: 0; padding: 0 4px; font-size: 12.5px; color: var(--muted); }
+aside { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
+.label { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.designs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.chip {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 2px 10px; align-items: center; text-align: left;
+  border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 10px; padding: 8px; cursor: pointer; font: inherit;
+}
+.chip .sw { grid-row: span 2; width: 34px; height: 34px; border-radius: 7px; background-size: 240% auto; background-position: 28% 52%; border: 1px solid var(--line); }
+.chip .nm { font-weight: 600; font-size: 13.5px; line-height: 1.2; min-width: 0; }
+.chip .rv { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); border-color: var(--chip-on); }
+.chip[aria-pressed="true"] .rv { color: inherit; opacity: 0.75; }
+.chip:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.views { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.btn { border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 8px; padding: 7px 6px; font: inherit; font-size: 13px; cursor: pointer; }
+.btn:hover, .chip:hover { border-color: var(--accent); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.toggles { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 18px; }
+.toggle { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; cursor: pointer; }
+.toggle input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; }
+.hint kbd { font-family: var(--body); font-size: 11.5px; border: 1px solid var(--line); border-radius: 4px; padding: 0 3px; margin-right: 1px; background: var(--panel); }
+.toggle[hidden] { display: none; }
+.stage canvas.panning, .stage canvas.panning:active { cursor: ns-resize; }
+.toast {
+  position: absolute; left: 50%; bottom: 44px; transform: translate(-50%, 6px); max-width: calc(100% - 32px);
+  background: var(--chip-on); color: var(--chip-on-ink); border-radius: 9px; padding: 8px 12px; font-size: 13px; line-height: 1.35;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); opacity: 0; pointer-events: none; transition: opacity 0.18s, transform 0.18s;
+}
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+@media (max-width: 820px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .stage { aspect-ratio: 3 / 4; max-height: 70vh; }
+  .designs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>PK MAX Drive Viewer</h1>
+    <div class="spec">Topdisk UDF909SC · 62.0 × 18.0 × 8.2 mm · print files of 2026-11-25</div>
+  </header>
+  <div class="main">
+    <div class="viewcol">
+      <div class="stage" id="stage">
+        <canvas id="c" aria-label="3D view of the drive. Drag to turn it, scroll or pinch to zoom, hold Command and drag to move it up and down."></canvas>
+        <div class="status" id="status">Loading the drive…</div>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </div>
+      <p class="hint">Drag to turn · scroll or pinch to zoom · <kbd>⌘</kbd> + drag to move up and down</p>
+    </div>
+    <aside>
+      <div class="card">
+        <div class="label">Design</div>
+        <div class="designs" id="designs"></div>
+      </div>
+      <div class="card">
+        <div class="row">
+          <div class="label">View</div>
+          <div class="toggles">
+            <label class="toggle" for="caps" id="caps-row" hidden><input type="checkbox" id="caps"> Explode</label>
+            <label class="toggle" for="spin"><input type="checkbox" id="spin" checked> Turn slowly</label>
+          </div>
+        </div>
+        <div class="views">
+          <button class="btn" data-view="front" type="button">Front</button>
+          <button class="btn" data-view="right" type="button">Right side</button>
+          <button class="btn" data-view="back" type="button">Back</button>
+          <button class="btn" data-view="left" type="button">Left side</button>
+          <button class="btn" data-view="corner" type="button">Corner</button>
+          <button class="btn" data-view="usba" type="button">USB-A end</button>
+          <button class="btn" data-view="usbc" type="button">USB-C end</button>
+        </div>
+        <p class="note">USB-A cap at the top (the end the back's ▲ PC/Mac points to), USB-C cap at the bottom, as in the drive's 3D file. These print files have four panels per part (front, back, and both sides), so the flat tip of each cap gets no artwork and shows the housing colour. Whether Topdisk could print that tip is not confirmed yet.</p>
+      </div>
+      <div class="card">
+        <div class="label">This design</div>
+        <dl class="facts" id="facts"></dl>
+        <p class="note">Flat-colour preview of the print artwork wrapped on the drive's measured shape. The joint bands are the drive's dark plastic; colours are screen approximations of the Pantone inks.</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DESIGNS = [
+  { key: "mahjong", name: "Mahjong", rev: "Rev K", inks: 6, base: "Cream PMS 9224 C", hex: "#f2e9db" },
+  { key: "gardening", name: "Gardening", rev: "Rev O", inks: 5, base: "Sage PMS 5803 C", hex: "#c3c6a8" },
+  { key: "fishing", name: "Fishing", rev: "Rev U", inks: 8, base: "Cream PMS 9224 C", hex: "#f2e9db" },
+  { key: "cross", name: "Christian Cross", rev: "Rev J", inks: 4, base: "Off-white PMS 9224 C", hex: "#f2e9db" },
+  { key: "flag", name: "American Flag", rev: "Rev K", inks: 3, base: "White", hex: "#ffffff" },
+  { key: "travel", name: "Travel", rev: "Rev J", inks: 4, base: "Soft blue PMS 656 C", hex: "#dde5ed" },
+];
+const S = 0.1;                         // scene units per mm
+const stage = document.getElementById("stage"), canvas = document.getElementById("c"), statusEl = document.getElementById("status");
+const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+// "Turn slowly" is remembered per viewer (Gavin, 2026-11-24). Only the checkbox itself saves it, so a View button
+// stopping the turn for a moment doesn't. With nothing saved, it starts on unless the viewer asks for reduced motion.
+const SPIN_KEY = "pkmax-viewer-turn-slowly";
+const spin = document.getElementById("spin");
+let savedSpin = null;
+try { savedSpin = localStorage.getItem(SPIN_KEY); } catch (e) {}
+spin.checked = savedSpin === "on" ? true : savedSpin === "off" ? false : !reduced;
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 100);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.dampingFactor = 0.08; controls.minDistance = 6; controls.maxDistance = 30;
+controls.enablePan = false; controls.autoRotate = spin.checked; controls.autoRotateSpeed = 1.4;
+spin.addEventListener("change", () => {
+  controls.autoRotate = spin.checked;
+  try { localStorage.setItem(SPIN_KEY, spin.checked ? "on" : "off"); } catch (e) {}
+});
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa3b2, 0.85));
+const key = new THREE.DirectionalLight(0xffffff, 0.55); key.position.set(4, 6, 8); scene.add(key);
+const rim = new THREE.DirectionalLight(0xffffff, 0.3); rim.position.set(-6, 2, -6); scene.add(rim);
+
+const mat = new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.0 });
+let mesh = null;
+const textures = {}; const loader = new THREE.TextureLoader();
+
+function interpRow(D, y) {                     // the outline's half-width and half-depth at panel row y
+  const ys = D.y; let i = 0;
+  while (i < ys.length - 2 && ys[i + 1] < y) i++;
+  const f = Math.min(1, Math.max(0, (y - ys[i]) / (ys[i + 1] - ys[i])));
+  return [D.w[i] + f * (D.w[i + 1] - D.w[i]), D.d[i] + f * (D.d[i + 1] - D.d[i])];
+}
+// lo..hi: the panel rows to include (panel y: the USB-A end is at -31); fans: close the tip(s) at lo and/or hi
+function buildGeometry(D, lo = -Infinity, hi = Infinity, fanLo = true, fanHi = true) {
+  const sec = D.section, n = sec.length, per = D.per, y0 = D.tex_y0, y1 = D.tex_y1;
+  const pos = [], uv = [], idx = [];
+  const rows = [];
+  if (isFinite(lo)) rows.push([lo, ...interpRow(D, lo)]);
+  for (let r = 0; r < D.y.length; r++)
+    if (D.w[r] > 0.05 && D.d[r] > 0.05 && D.y[r] > lo + 1e-6 && D.y[r] < hi - 1e-6) rows.push([D.y[r], D.w[r], D.d[r]]);
+  if (isFinite(hi)) rows.push([hi, ...interpRow(D, hi)]);
+  rows.forEach(([y, wf, df]) => {
+    const w = wf / 9.0, d = df / 4.1, v = 1 - (y - y0) / (y1 - y0);
+    for (let j = 0; j <= n; j++) {
+      const p = sec[j % n];
+      pos.push(p[1] * w * S, -y * S, p[2] * d * S);
+      uv.push(j < n ? p[0] / per : 1.0, v);
+    }
+  });
+  const R = rows.length;
+  for (let r = 0; r < R - 1; r++) for (let j = 0; j < n; j++) {
+    const a0 = r * (n + 1) + j, a1 = a0 + 1, b0 = a0 + n + 1, b1 = b0 + 1;
+    idx.push(a0, b0, a1, a1, b0, b1);
+  }
+  const sideCount = idx.length;
+  [[0, true, fanLo], [R - 1, false, fanHi]].forEach(([r, flip, on]) => {   // close a tip with a fan (unprinted: base colour)
+    if (!on) return;
+    const c = pos.length / 3, y = rows[r][0];
+    pos.push(0, -y * S, 0); uv.push(0.5, 1 - (y - y0) / (y1 - y0));
+    for (let j = 0; j < n; j++) {
+      const a0 = r * (n + 1) + j, a1 = a0 + 1;
+      if (flip) idx.push(c, a0, a1); else idx.push(c, a1, a0);     // facing out, so both ends are closed
+    }
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx); g.computeVertexNormals();
+  g.addGroup(0, sideCount, 0); g.addGroup(sideCount, idx.length - sideCount, 1);
+  return g;
+}
+
+function texture(k) {
+  if (!textures[k]) {
+    textures[k] = new Promise((res, rej) => loader.load(k + ".png", t => {
+      t.encoding = THREE.sRGBEncoding; t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; res(t);
+    }, undefined, () => rej(new Error("The " + k + " texture didn't load."))));
+  }
+  return textures[k];
+}
+
+const VIEWS = {
+  front: [0, 0.4, 1], back: [0, 0.4, -1], right: [1, 0.4, 0], left: [-1, 0.4, 0],
+  corner: [0.72, 0.45, 0.72], usba: [0.02, 1, 0.25], usbc: [0.02, -1, 0.25],
+};
+function setView(name) {
+  const v = VIEWS[name], dist = 14.5, L = Math.hypot(v[0], v[1], v[2]);     // the whole 62 mm drive in frame
+  camera.position.set(v[0] / L * dist, v[1] / L * dist, v[2] / L * dist);
+  controls.target.set(0, 0, 0); controls.update();
+}
+document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => {
+  spin.checked = false; controls.autoRotate = false; setView(b.dataset.view);
+}));
+
+const list = document.getElementById("designs"), facts = document.getElementById("facts");
+DESIGNS.forEach((d, i) => {
+  const b = document.createElement("button");
+  b.className = "chip"; b.type = "button"; b.id = "design-" + d.key; b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+  b.innerHTML = '<span class="sw" style="background-image:url(' + d.key + '.png)"></span><span class="nm">' + d.name + '</span><span class="rv">' + d.rev + '</span>';
+  b.addEventListener("click", () => show(d.key));
+  list.appendChild(b);
+});
+
+async function show(k) {
+  const d = DESIGNS.find(x => x.key === k);
+  document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", c.id === "design-" + k ? "true" : "false"));
+  facts.innerHTML = "<dt>Design</dt><dd>" + d.name + "</dd><dt>Print file</dt><dd>" + d.rev + "</dd><dt>Inks</dt><dd>" + d.inks + " spot + base</dd><dt>Base</dt><dd>" + d.base + "</dd>";
+  capInMat.color.set(d.hex); capInMat.color.convertSRGBToLinear();          // the caps are moulded in the base colour
+  try { location.replace("#" + k); } catch (e) {}
+  try {
+    statusEl.textContent = "Loading " + d.name + "…";
+    mat.map = await texture(k); mat.needsUpdate = true; statusEl.textContent = "";
+  } catch (e) { statusEl.textContent = e.message + " Reload the page to try again."; }
+}
+
+function resize() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+// ---- taking the caps off (Gavin, 2026-11-24): the caps slide off along the drive and show what the factory's STEP has
+// under them - the dark inner carriers (the joint bands are these, showing between cap and body) and the USB-A and
+// USB-C plugs. parts.json comes from parts.py; its meshes are in mm, in this scene's frame.
+const capsBox = document.getElementById("caps"), capsRow = document.getElementById("caps-row");
+const darkMat = new THREE.MeshStandardMaterial({ color: 0x2a2c31, roughness: 0.6, metalness: 0.0 });
+// The plugs are light silver (Gavin, 2026-11-24: "too gray. They should be a lighter silver color"). A metal shows what
+// it reflects, and the scene had nothing to reflect, so a half-metal grey read flat and dark. The plugs alone now reflect
+// a soft studio made here: light overhead, pale at the horizon, darker below, brighter toward the front right, so each
+// face of the shell catches a different tone. The printed parts don't use it, so their colours are unchanged.
+function studioEnv() {
+  const s = new THREE.Scene(), g = new THREE.SphereGeometry(10, 64, 32), p = g.attributes.position, col = [];
+  const top = new THREE.Color(0xffffff), mid = new THREE.Color(0xe2e6eb), low = new THREE.Color(0x6e747c), AMP = 0.45;
+  for (let i = 0; i < p.count; i++) {
+    const t = p.getY(i) / 10;
+    const c = t > 0 ? mid.clone().lerp(top, Math.min(1, t * 1.6)) : mid.clone().lerp(low, Math.min(1, -t * 1.4));
+    c.multiplyScalar(1 - AMP + AMP * (0.5 + 0.5 * Math.cos(Math.atan2(p.getZ(i), p.getX(i)) - Math.PI / 4)));
+    col.push(c.r, c.g, c.b);
+  }
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  s.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+  const pm = new THREE.PMREMGenerator(renderer), env = pm.fromScene(s, 0.02).texture;
+  pm.dispose(); g.dispose(); return env;
+}
+const studio = studioEnv();
+const metalMat = new THREE.MeshStandardMaterial({ color: 0xeef0f3, roughness: 0.3, metalness: 1.0, envMap: studio });
+// Plug detail (Gavin, 2026-11-25: "i can't see the detail on the ports"): the STEP makes each plug one solid, so the USB-A
+// tongue and the insides of both openings were the same silver as the shells and vanished. parts.json (plug_detail.py) now
+// splits them out: the tongue and the USB-C contact housings in dark plastic, the deep ends of the openings near black,
+// and gold contacts (from the USB specs; the STEP has none). The shells keep metalMat.
+const voidMat = new THREE.MeshStandardMaterial({ color: 0x0c0d10, roughness: 0.9, metalness: 0.0 });
+const goldMat = new THREE.MeshStandardMaterial({ color: 0xe0b34f, roughness: 0.3, metalness: 1.0, envMap: studio });
+const capInMat = new THREE.MeshStandardMaterial({ color: 0xf2e9db, roughness: 0.55, metalness: 0.0, side: THREE.DoubleSide });
+[darkMat, metalMat, voidMat, goldMat].forEach(m => m.color.convertSRGBToLinear());
+const apart = new THREE.Group(); apart.visible = false; scene.add(apart);
+let capA = null, capC = null, explode = 0, explodeTo = 0;
+const CAP_TRAVEL = 17;                          // mm each cap slides off: clear of the plugs (USB-A 13.5 mm past its cap's rim)
+function partMesh(P, m) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(P.pos.map(c => c * S), 3));
+  g.setIndex(P.idx); g.computeVertexNormals();
+  return new THREE.Mesh(g, m);
+}
+function buildApart(D, P) {
+  apart.add(new THREE.Mesh(buildGeometry(D, -14.7, 14.7, false, false), [mat, mat]));        // the body
+  ["plastic_a", "plastic_c"].forEach(k => apart.add(partMesh(P[k], darkMat)));
+  ["plug_a", "plug_c"].forEach(k => apart.add(partMesh(P[k], metalMat)));
+  [["plug_plastic", darkMat], ["plug_void", voidMat], ["plug_gold", goldMat]].forEach(([k, m]) => { if (P[k]) apart.add(partMesh(P[k], m)); });
+  capA =new THREE.Group(); capC = new THREE.Group();
+  capA.add(new THREE.Mesh(buildGeometry(D, -Infinity, -15.7, true, false), [mat, mat]), partMesh(P.cap_a_in, capInMat));
+  capC.add(new THREE.Mesh(buildGeometry(D, 15.7, Infinity, false, true), [mat, mat]), partMesh(P.cap_c_in, capInMat));
+  apart.add(capA, capC);
+  capsRow.hidden = false;
+}
+let camAway = null;                             // the camera distance before the caps came off, if we moved it
+capsBox.addEventListener("change", () => {
+  explodeTo = capsBox.checked ? 1 : 0;
+  const dist = camera.position.distanceTo(controls.target);
+  if (capsBox.checked && dist > 11 && dist < 26.5) { camAway = dist; zoomTo(26.5); }     // keep both caps in frame
+  else if (!capsBox.checked && camAway !== null) { zoomTo(camAway); camAway = null; }
+});
+let zoomAnim = null;
+function zoomTo(d) { zoomAnim = { from: camera.position.distanceTo(controls.target), to: d, t: 0 }; }
+function stepAnim(dt) {
+  if (explode !== explodeTo) {
+    explode = explodeTo > explode ? Math.min(1, explode + dt / (reduced ? 0.001 : 0.7)) : Math.max(0, explode - dt / (reduced ? 0.001 : 0.7));
+    const e = explode < 0.5 ? 2 * explode * explode : 1 - Math.pow(-2 * explode + 2, 2) / 2;   // ease in-out
+    if (capA) { capA.position.y = e * CAP_TRAVEL * S; capC.position.y = -e * CAP_TRAVEL * S; }
+    if (mesh) mesh.visible = explode === 0; apart.visible = explode > 0;
+  }
+  if (zoomAnim) {
+    zoomAnim.t = Math.min(1, zoomAnim.t + dt / (reduced ? 0.001 : 0.7));
+    const e = 1 - Math.pow(1 - zoomAnim.t, 3), d = zoomAnim.from + (zoomAnim.to - zoomAnim.from) * e;
+    const dir = camera.position.clone().sub(controls.target).normalize();
+    camera.position.copy(controls.target).addScaledVector(dir, d);
+    if (zoomAnim.t >= 1) zoomAnim = null;
+  }
+}
+
+// ---- Cmd + drag moves the drive up and down on screen, keeping the zoom (Gavin, 2026-11-24; it was Cmd+Shift + scroll).
+// The press is caught on the stage, before OrbitControls on the canvas sees it (it would turn the drive, or pan freely).
+// The drive follows the pointer: the camera slides along the screen's up direction by the pointer's move at the
+// target's depth. Fully zoomed out, the whole drive is already in view, so it stays put and a toast says so.
+const toastEl = document.getElementById("toast"); let toastTimer = 0;
+function toast(msg) {
+  toastEl.textContent = msg; toastEl.classList.add("on");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove("on"), 2600);
+}
+const ZOOMED_OUT = 0.05;                        // within this of maxDistance counts as fully zoomed out
+let pan = null;                                 // { id, y } while a Cmd-drag is moving the drive
+stage.addEventListener("pointerdown", e => {
+  if (!e.metaKey || e.button !== 0 || e.target !== canvas) return;
+  e.preventDefault(); e.stopPropagation();
+  if (camera.position.distanceTo(controls.target) >= controls.maxDistance - ZOOMED_OUT) {
+    toast("Fully zoomed out. Zoom in to move the drive up or down.");
+    return;
+  }
+  pan = { id: e.pointerId, y: e.clientY };
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}         // keeps the drag going off the canvas
+  canvas.classList.add("panning");
+}, { capture: true });
+stage.addEventListener("mousedown", e => { if (e.metaKey && e.target === canvas) e.stopPropagation(); }, { capture: true });
+canvas.addEventListener("pointermove", e => {
+  if (!pan || e.pointerId !== pan.id) return;
+  const dy = e.clientY - pan.y; pan.y = e.clientY;
+  const dist = camera.position.distanceTo(controls.target);
+  const perPx = 2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / Math.max(1, canvas.clientHeight);
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);              // the screen's up, in the scene
+  const move = up.multiplyScalar(dy * perPx);                                            // drag up: the drive rises
+  const lim = (31 + CAP_TRAVEL * explodeTo + 2) * S;                                     // stay on the drive
+  const next = controls.target.clone().add(move);
+  if (next.length() > lim) move.add(next.clone().setLength(lim).sub(next));
+  controls.target.add(move); camera.position.add(move);
+});
+function endPan(e) {
+  if (!pan || e.pointerId !== pan.id) return;
+  pan = null; canvas.classList.remove("panning");
+  if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+}
+canvas.addEventListener("pointerup", endPan); canvas.addEventListener("pointercancel", endPan);
+// Zooming out brings a moved drive back to the middle (Gavin, 2026-11-25: "If I zoom in, the move up/down, then zoom back
+// out, the drive should re-center itself"). Each step out shrinks the move by the share of the zoom-out room it used, so
+// the drive drifts back as the view widens and is centred exactly when fully zoomed out. Zooming in leaves it where it is.
+let lastDist = null;
+function recenterOnZoomOut() {
+  const d = camera.position.distanceTo(controls.target), max = controls.maxDistance;
+  if (lastDist !== null && d > lastDist + 1e-6 && controls.target.lengthSq() > 0) {
+    const k = d >= max - 1e-4 ? 0 : Math.max(0, (max - d) / Math.max(1e-6, max - lastDist));
+    const back = controls.target.clone().multiplyScalar(k - 1);                         // toward the middle
+    controls.target.add(back); camera.position.add(back);
+  }
+  lastDist = d;
+}
+// the up-down cursor while Command is held over the drive, so the gesture is discoverable
+window.addEventListener("keydown", e => { if (e.key === "Meta") canvas.classList.add("panning"); });
+window.addEventListener("keyup", e => { if (e.key === "Meta" && !pan) canvas.classList.remove("panning"); });
+window.addEventListener("blur", () => { if (!pan) canvas.classList.remove("panning"); });
+
+Promise.all([
+  fetch("drive.json").then(r => { if (!r.ok) throw new Error("The drive's shape didn't load."); return r.json(); }),
+  fetch("parts.json").then(r => r.ok ? r.json() : null).catch(() => null),
+]).then(([D, P]) => {
+  mesh = new THREE.Mesh(buildGeometry(D), [mat, mat]); scene.add(mesh);     // the flat ends are unprinted: housing colour (bake.py)
+  if (P) buildApart(D, P);                                                     // without it, no caps-off option
+  const start = (location.hash || "").slice(1);
+  setView("corner"); resize();
+  show(DESIGNS.some(d => d.key === start) ? start : "mahjong");
+  let last = performance.now();
+  (function loop(now) {
+    now = now || performance.now(); stepAnim(Math.min(0.1, (now - last) / 1000)); last = now;
+    controls.update(); recenterOnZoomOut(); renderer.render(scene, camera); requestAnimationFrame(loop);
+  })();
+}).catch(e => { statusEl.textContent = e.message + " Reload the page to try again."; });
+window.addEventListener("hashchange", () => { const k = location.hash.slice(1); if (DESIGNS.some(d => d.key === k)) show(k); });
+</script>
+</html>
